@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fanfic Player</title>
+<meta name="theme-color" content="#900000">
+<meta name="description" content="Leitor de fanfics 100% offline, local-first, inspirado no AO3.">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon-192.svg">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="./style.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+</head>
+<body data-theme="light">
+
+<!-- ===================== TELA DE PERFIS ===================== -->
+<div id="fp-profile-screen" class="fp-screen fp-screen--center">
+  <div class="fp-profile-box">
+    <i class="fa-solid fa-scroll fp-logo-icon"></i>
+    <h1 class="fp-logo-title">Fanfic Player</h1>
+    <p class="fp-logo-sub">Sua biblioteca offline, local-first.</p>
+    <div id="fp-profile-list" class="fp-profile-list"></div>
+    <button id="fp-new-profile-btn" class="fp-btn fp-btn--primary fp-btn--block">
+      <i class="fa-solid fa-plus"></i> Novo Perfil
+    </button>
+  </div>
+</div>
+
+<!-- ===================== SHELL DO APP ===================== -->
+<div id="fp-app" class="fp-app hidden">
+
+  <!-- Overlay da sidebar (mobile) -->
+  <div id="fp-sidebar-overlay" class="fp-sidebar-overlay hidden"></div>
+
+  <!-- SIDEBAR -->
+  <aside id="fp-sidebar" class="fp-sidebar">
+    <div class="fp-sidebar-header">
+      <button id="fp-sidebar-profile-btn" class="fp-sidebar-profile">
+        <i class="fa-solid fa-circle-user"></i>
+        <span id="fp-sidebar-profile-name">Perfil</span>
+      </button>
+      <button id="fp-sidebar-close-btn" class="fp-icon-btn fp-sidebar-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <nav class="fp-sidebar-nav">
+      <button class="fp-sidebar-link fp-tab active" data-tab="todas"><i class="fa-solid fa-layer-group"></i> Todas</button>
+      <button class="fp-sidebar-link fp-tab" data-tab="lendo"><i class="fa-solid fa-book-open-reader"></i> Lendo</button>
+      <button class="fp-sidebar-link fp-tab" data-tab="querer"><i class="fa-regular fa-bookmark"></i> Quero Ler</button>
+      <button class="fp-sidebar-link fp-tab" data-tab="favoritas"><i class="fa-solid fa-heart"></i> Favoritas</button>
+      <button class="fp-sidebar-link fp-tab" data-tab="series"><i class="fa-solid fa-sitemap"></i> Séries / Coleções</button>
+      <button class="fp-sidebar-link fp-tab" data-tab="anotacoes"><i class="fa-regular fa-comment-dots"></i> Minhas Anotações</button>
+      <div class="fp-sidebar-divider"></div>
+      <button id="fp-sidebar-vault-btn" class="fp-sidebar-link"><i class="fa-solid fa-user-lock"></i> Cofre Secreto</button>
+      <button id="fp-sidebar-backup-btn" class="fp-sidebar-link"><i class="fa-solid fa-box-archive"></i> Backup</button>
+      <button id="fp-sidebar-settings-btn" class="fp-sidebar-link"><i class="fa-solid fa-palette"></i> Skins &amp; Config.</button>
+    </nav>
+
+    <button id="fp-sidebar-switch-profile-btn" class="fp-sidebar-link fp-sidebar-footer-link">
+      <i class="fa-solid fa-right-left"></i> Trocar de Perfil
+    </button>
+  </aside>
+
+  <!-- ÁREA PRINCIPAL -->
+  <div class="fp-main">
+
+    <!-- TOPBAR -->
+    <header id="fp-topbar" class="fp-topbar">
+      <button id="fp-open-sidebar-btn" class="fp-icon-btn fp-icon-btn--light"><i class="fa-solid fa-bars"></i></button>
+      <h1 class="fp-topbar-title"><i class="fa-solid fa-scroll"></i> Fanfic Player</h1>
+      <button id="fp-import-btn-top" class="fp-icon-btn fp-icon-btn--light"><i class="fa-solid fa-circle-plus"></i></button>
+    </header>
+
+    <!-- ===================== DASHBOARD ===================== -->
+    <main id="fp-view-dashboard" class="fp-view-dashboard">
+
+      <!-- Widget Continue Lendo -->
+      <section class="fp-section">
+        <div id="fp-continue-widget" class="fp-continue-widget hidden">
+          <div class="fp-continue-header">Continue Lendo</div>
+          <div id="fp-continue-content" class="fp-continue-content"></div>
+        </div>
+      </section>
+
+      <!-- Tabs horizontais (mobile, espelham a sidebar) -->
+      <nav class="fp-tabs-mobile">
+        <button class="fp-tab fp-tab-mobile active" data-tab="todas">Todas</button>
+        <button class="fp-tab fp-tab-mobile" data-tab="lendo">Lendo</button>
+        <button class="fp-tab fp-tab-mobile" data-tab="querer">Quero Ler</button>
+        <button class="fp-tab fp-tab-mobile" data-tab="favoritas">Favoritas</button>
+        <button class="fp-tab fp-tab-mobile" data-tab="series">Séries</button>
+        <button class="fp-tab fp-tab-mobile" data-tab="anotacoes">Anotações</button>
+      </nav>
+
+      <section class="fp-section">
+        <div class="fp-search-row">
+          <input id="fp-search-input" type="text" placeholder="Buscar por título, autor, fandom ou tag..." class="fp-input">
+        </div>
+
+        <!-- Séries / Coleções -->
+        <div id="fp-series-view" class="hidden">
+          <div id="fp-series-list" class="fp-series-list"></div>
+        </div>
+
+        <div id="fp-book-grid" class="fp-book-grid"></div>
+        <div id="fp-notes-list" class="fp-notes-list hidden"></div>
+        <p id="fp-empty-msg" class="fp-empty-msg hidden">Nenhuma fanfic por aqui ainda. Importe sua primeira leitura!</p>
+      </section>
+    </main>
+
+    <!-- ===================== LEITOR ===================== -->
+    <main id="fp-view-reader" class="fp-view-reader hidden">
+      <div id="fp-reader-toolbar" class="fp-reader-toolbar">
+        <button id="fp-reader-back-btn" class="fp-icon-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="fp-reader-title-box">
+          <p id="fp-reader-title" class="fp-reader-title"></p>
+          <p id="fp-reader-chapter" class="fp-reader-chapter"></p>
+        </div>
+        <div class="fp-reader-actions">
+          <button id="fp-toc-btn" class="fp-icon-btn" title="Capítulos"><i class="fa-solid fa-list"></i></button>
+          <button id="fp-tts-btn" class="fp-icon-btn" title="Audiobook"><i class="fa-solid fa-headphones"></i></button>
+          <button id="fp-theme-btn" class="fp-icon-btn" title="Skins"><i class="fa-solid fa-palette"></i></button>
+          <button id="fp-zen-btn" class="fp-icon-btn" title="Modo Foco"><i class="fa-solid fa-eye"></i></button>
+        </div>
+      </div>
+
+      <div id="fp-reader-scroll" class="fp-reader-scroll">
+        <div id="reader-content" class="fp-reader-content"></div>
+      </div>
+
+      <div id="fp-reader-bottombar" class="fp-reader-bottombar">
+        <span id="fp-progress-label" class="fp-progress-label">0%</span>
+        <input id="fp-progress-slider" type="range" min="0" max="1000" value="0" class="fp-progress-slider">
+        <span id="fp-time-remaining" class="fp-time-remaining">--</span>
+      </div>
+
+      <!-- Mini player TTS -->
+      <div id="fp-tts-player" class="fp-tts-player hidden">
+        <button id="fp-tts-playpause" class="fp-icon-btn"><i class="fa-solid fa-play"></i></button>
+        <button id="fp-tts-stop" class="fp-icon-btn"><i class="fa-solid fa-stop"></i></button>
+        <select id="fp-tts-speed" class="fp-select fp-select--sm">
+          <option value="1">1x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+        </select>
+        <span class="fp-tts-label">Modo Audiobook</span>
+      </div>
+
+      <!-- Popover de seleção inteligente -->
+      <div id="fp-selection-popover" class="fp-selection-popover hidden"></div>
+    </main>
+  </div>
+</div>
+
+<!-- ===================== MODAL: IMPORTAR ===================== -->
+<div id="fp-import-modal" class="fp-modal-backdrop hidden">
+  <div class="fp-modal">
+    <div class="fp-modal-header">
+      <h2 class="fp-modal-title">Importar Fanfic</h2>
+      <button class="fp-icon-btn fp-close-modal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="fp-segmented">
+      <button data-importtab="arquivo" class="fp-segmented-btn active">Arquivo</button>
+      <button data-importtab="link" class="fp-segmented-btn">Link do AO3</button>
+    </div>
+    <div id="fp-import-arquivo" class="fp-import-pane">
+      <input id="fp-file-input" type="file" accept=".epub,.pdf,.txt" class="fp-input fp-input--file">
+      <p class="fp-hint">Suporta EPUB, PDF e TXT.</p>
+    </div>
+    <div id="fp-import-link" class="fp-import-pane hidden">
+      <input id="fp-ao3-url" type="text" placeholder="Cole o link da obra no AO3" class="fp-input">
+      <p class="fp-hint">Se o navegador bloquear o acesso direto (CORS), cole abaixo o HTML da página para extração automática dos metadados.</p>
+      <textarea id="fp-ao3-html" rows="4" placeholder="Colar HTML da página do AO3 aqui (opcional)" class="fp-textarea"></textarea>
+      <button id="fp-ao3-fetch-btn" class="fp-btn fp-btn--primary fp-btn--block">Buscar Metadados</button>
+    </div>
+    <div id="fp-import-preview" class="fp-import-preview hidden"></div>
+    <button id="fp-import-confirm-btn" class="fp-btn fp-btn--primary fp-btn--block hidden">Adicionar à Biblioteca</button>
+  </div>
+</div>
+
+<!-- ===================== MODAL: DETALHE DO LIVRO ===================== -->
+<div id="fp-detail-modal" class="fp-modal-backdrop hidden">
+  <div class="fp-modal">
+    <div class="fp-modal-header fp-modal-header--detail">
+      <div>
+        <h2 id="fp-detail-title" class="fp-detail-title"></h2>
+        <p id="fp-detail-author" class="fp-detail-author"></p>
+      </div>
+      <button class="fp-icon-btn fp-close-modal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="fp-detail-badges" class="fp-badges"></div>
+    <p id="fp-detail-summary" class="fp-detail-summary"></p>
+    <div id="fp-detail-tags" class="fp-tags"></div>
+    <div class="fp-detail-row">
+      <select id="fp-detail-status" class="fp-select">
+        <option value="querer">Quero Ler</option>
+        <option value="lendo">Lendo</option>
+        <option value="lida">Lida</option>
+      </select>
+      <button id="fp-detail-fav-btn" class="fp-btn fp-btn--outline"><i class="fa-regular fa-heart"></i> Favoritar</button>
+    </div>
+    <div class="fp-detail-row">
+      <select id="fp-detail-series" class="fp-select">
+        <option value="">Sem série / coleção</option>
+      </select>
+      <button id="fp-detail-new-series-btn" class="fp-btn fp-btn--outline" title="Nova série"><i class="fa-solid fa-plus"></i></button>
+    </div>
+    <button id="fp-detail-vault-btn" class="fp-btn fp-btn--outline fp-btn--block"><i class="fa-solid fa-user-lock"></i> Mover para o Cofre Secreto</button>
+    <button id="fp-detail-open-btn" class="fp-btn fp-btn--primary fp-btn--block"><i class="fa-solid fa-book-open"></i> Abrir Leitura</button>
+    <button id="fp-detail-delete-btn" class="fp-btn fp-btn--danger fp-btn--block">Remover da Biblioteca</button>
+  </div>
+</div>
+
+<!-- ===================== MODAL: TOC (CAPÍTULOS) ===================== -->
+<div id="fp-toc-modal" class="fp-modal-backdrop hidden">
+  <div class="fp-modal">
+    <div class="fp-modal-header">
+      <h2 class="fp-modal-title">Capítulos</h2>
+      <button class="fp-icon-btn fp-close-modal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="fp-toc-list" class="fp-toc-list"></div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: SKINS & CONFIGURAÇÕES ===================== -->
+<div id="fp-settings-modal" class="fp-modal-backdrop hidden">
+  <div class="fp-modal">
+    <div class="fp-modal-header">
+      <h2 class="fp-modal-title">Skins &amp; Configurações</h2>
+      <button class="fp-icon-btn fp-close-modal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <p class="fp-field-label">Skin / Tema</p>
+    <div class="fp-theme-grid">
+      <button data-theme-opt="light" class="fp-theme-opt">Light AO3</button>
+      <button data-theme-opt="dark" class="fp-theme-opt">Noturno OLED</button>
+      <button data-theme-opt="sepia" class="fp-theme-opt">Sépia Quente</button>
+      <button data-theme-opt="cyberpunk" class="fp-theme-opt">Cyberpunk</button>
+    </div>
+
+    <label class="fp-switch-row">
+      <span>Modo Noturno Automático (19h–7h)</span>
+      <input id="fp-auto-night" type="checkbox">
+    </label>
+
+    <p class="fp-field-label">Tamanho da Fonte</p>
+    <div class="fp-font-size-row">
+      <button id="fp-font-dec" class="fp-icon-btn fp-icon-btn--bordered">A-</button>
+      <span id="fp-font-size-label" class="fp-font-size-label">17px</span>
+      <button id="fp-font-inc" class="fp-icon-btn fp-icon-btn--bordered">A+</button>
+    </div>
+
+    <p class="fp-field-label">Glossário Anti-Tradução</p>
+    <div class="fp-glossary-row">
+      <input id="fp-glossary-input" type="text" placeholder="Termo a proteger (ex: nome próprio)" class="fp-input">
+      <button id="fp-glossary-add" class="fp-btn fp-btn--primary">Add</button>
+    </div>
+    <div id="fp-glossary-list" class="fp-glossary-list"></div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: BACKUP ===================== -->
+<div id="fp-backup-modal" class="fp-modal-backdrop hidden">
+  <div class="fp-modal">
+    <div class="fp-modal-header">
+      <h2 class="fp-modal-title">Cofre de Backup</h2>
+      <button class="fp-icon-btn fp-close-modal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="fp-hint">Exporte sua biblioteca e progresso (perfil atual) em JSON, ou importe um backup anterior.</p>
+    <button id="fp-export-btn" class="fp-btn fp-btn--primary fp-btn--block"><i class="fa-solid fa-file-export"></i> Exportar Backup (.json)</button>
+    <label class="fp-btn fp-btn--outline fp-btn--block fp-file-label">
+      <i class="fa-solid fa-file-import"></i> Importar Backup
+      <input id="fp-import-backup-input" type="file" accept="application/json" class="hidden">
+    </label>
+  </div>
+</div>
+
+<!-- ===================== MODAL: ANOTAÇÃO ===================== -->
+<div id="fp-note-modal" class="fp-modal-backdrop hidden">
+  <div class="fp-modal">
+    <div class="fp-modal-header">
+      <h2 class="fp-modal-title">Nota de Margem</h2>
+      <button class="fp-icon-btn fp-close-modal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <textarea id="fp-note-text" rows="4" placeholder="Escreva sua nota..." class="fp-textarea"></textarea>
+    <div class="fp-detail-row">
+      <button id="fp-note-save-btn" class="fp-btn fp-btn--primary">Salvar</button>
+      <button id="fp-note-delete-btn" class="fp-btn fp-btn--danger hidden">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: NOVA SÉRIE / COLEÇÃO ===================== -->
+<div id="fp-series-modal" class="fp-modal-backdrop hidden">
+  <div class="fp-modal">
+    <div class="fp-modal-header">
+      <h2 class="fp-modal-title">Nova Série / Coleção</h2>
+      <button class="fp-icon-btn fp-close-modal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <input id="fp-series-name-input" type="text" placeholder="Nome da série ou universo" class="fp-input">
+    <button id="fp-series-save-btn" class="fp-btn fp-btn--primary fp-btn--block">Criar</button>
+  </div>
+</div>
+
+<!-- ===================== MODAL: COFRE SECRETO (PIN) ===================== -->
+<div id="fp-vault-pin-modal" class="fp-modal-backdrop hidden">
+  <div class="fp-modal fp-modal--narrow">
+    <div class="fp-modal-header">
+      <h2 id="fp-vault-pin-title" class="fp-modal-title">Cofre Secreto</h2>
+      <button class="fp-icon-btn fp-close-modal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p id="fp-vault-pin-hint" class="fp-hint">Digite o PIN de 4 dígitos para acessar o cofre.</p>
+    <input id="fp-vault-pin-input" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="••••" class="fp-input fp-input--pin">
+    <button id="fp-vault-pin-confirm-btn" class="fp-btn fp-btn--primary fp-btn--block">Confirmar</button>
+  </div>
+</div>
+
+<div id="fp-vault-view-modal" class="fp-modal-backdrop hidden">
+  <div class="fp-modal">
+    <div class="fp-modal-header">
+      <h2 class="fp-modal-title"><i class="fa-solid fa-user-lock"></i> Cofre Secreto</h2>
+      <button class="fp-icon-btn fp-close-modal"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="fp-vault-book-grid" class="fp-book-grid"></div>
+    <p id="fp-vault-empty-msg" class="fp-empty-msg hidden">O cofre está vazio.</p>
+  </div>
+</div>
+
+<div id="fp-toast" class="fp-toast hidden"></div>
+
+<script src="./app.js" defer></script>
+</body>
+</html>
